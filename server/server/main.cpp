@@ -3,7 +3,9 @@
 #include <ws2tcpip.h>
 #include <tchar.h>
 #include <thread>
+#include <vector>
 #pragma comment(lib, "ws2_32.lib")
+
 using namespace std;
 
 //Function to initialize the winsock
@@ -13,7 +15,7 @@ bool Initialize() {
 }
 
 //Function to keep the server always up and running
-void InteractWithClient(SOCKET clientSocket){
+void InteractWithClient(SOCKET clientSocket, vector<SOCKET> &clients){
 	
 	cout << "Client connected..." << endl;
 	char buffer[4096];
@@ -26,6 +28,18 @@ void InteractWithClient(SOCKET clientSocket){
 		}
 		string message(buffer, bytesrecvd);
 		cout << "Message from client : " << message << endl;
+
+		for (auto client : clients) {
+			if (client != clientSocket) {
+				send(client, message.c_str(), message.length(), 0);
+			}
+		}
+
+		auto it = find(clients.begin(), clients.end(), clientSocket);
+		if (it != clients.end()) {
+			clients.erase(it);
+		}
+
 	}
 	
 	closesocket(clientSocket);
@@ -76,6 +90,7 @@ int main() {
 	}
 
 	cout << "The server has started to listen on the port " << port << endl;
+	vector<SOCKET> clients;
 
 	while (1) {
 		//Accept
@@ -88,7 +103,8 @@ int main() {
 			return 1;
 		}
 
-		thread t1(InteractWithClient, clientSocket);
+		clients.push_back(clientSocket);      //Store the clientsockets into the vector
+		thread t1(InteractWithClient, clientSocket, std::ref(clients));
 	}
 	
 	closesocket(listenSocket);
