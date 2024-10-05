@@ -2,6 +2,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <tchar.h>
+#include <thread>
 #pragma comment(lib, "ws2_32.lib")
 using namespace std;
 
@@ -9,6 +10,25 @@ using namespace std;
 bool Initialize() {
 	WSADATA data;
 	return WSAStartup(MAKEWORD(2, 2), &data) == 0; //0 indicates successful init
+}
+
+//Function to keep the server always up and running
+void InteractWithClient(SOCKET clientSocket){
+	
+	cout << "Client connected..." << endl;
+	char buffer[4096];
+
+	while (1) {
+		int bytesrecvd = recv(clientSocket, buffer, sizeof(buffer), 0); //recv is a blocking call here
+		if (bytesrecvd <= 0) {
+			cout << "Client disconnected..." << endl;
+			break;
+		}
+		string message(buffer, bytesrecvd);
+		cout << "Message from client : " << message << endl;
+	}
+	
+	closesocket(clientSocket);
 }
 
 int main() {
@@ -57,21 +77,20 @@ int main() {
 
 	cout << "The server has started to listen on the port " << port << endl;
 
-	SOCKET clientSocket = accept(listenSocket, nullptr, nullptr);
+	while (1) {
+		//Accept
+		SOCKET clientSocket = accept(listenSocket, nullptr, nullptr);
 
-	if (clientSocket == INVALID_SOCKET) {
-		cout << "Invalid client socket..." << endl;
-		closesocket(listenSocket);
-		WSACleanup();
-		return 1;
+		if (clientSocket == INVALID_SOCKET) {
+			cout << "Invalid client socket..." << endl;
+			closesocket(listenSocket);
+			WSACleanup();
+			return 1;
+		}
+
+		thread t1(InteractWithClient, clientSocket);
 	}
-
-	char buffer[4096]; 
-	int bytesrecvd = recv(clientSocket, buffer, sizeof(buffer), 0);
-	string message(buffer, bytesrecvd);
-	cout << "Message from client : " << message << endl;
-
-	closesocket(clientSocket);
+	
 	closesocket(listenSocket);
 
 	WSACleanup(); //finalization
